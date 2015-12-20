@@ -28,7 +28,7 @@
     <application 
         android:label="@string/app_name"
         android:theme="@android:style/Theme.Holo.Light"
-        android:icon="@drawable/teeptrak_launcher">
+        android:icon="@drawable/teeptrak_launcher_logo">
 
         <activity
             android:name=".SplashscreenActivity"
@@ -55,17 +55,17 @@
 
         <activity
             android:name=".MainActivity"
-            android:label="@string/app_name"
+            android:label="@string/app_title"
             android:windowSoftInputMode="stateHidden"
             android:configChanges="keyboardHidden|orientation|screenSize">
-            <intent-filter>
+            <!-- intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+            </intent-filter -->
         </activity>
         <activity
             android:name=".DeviceListActivity"
-            android:label="@string/app_name"
+            android:label="@string/app_title"
             android:theme="@android:style/Theme.Dialog" />
         <service
             android:enabled="true"
