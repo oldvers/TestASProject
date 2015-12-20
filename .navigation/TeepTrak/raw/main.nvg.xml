@@ -6,7 +6,7 @@
     <statePointEntry>
       <state      
         class = "com.android.tools.idea.editors.navigation.model.ActivityState"      
-        className = "com.nordicsemi.nrfUARTv2.DeviceListActivity"/>
+        className = "com.teeptrak.controller.DeviceListActivity"/>
       <point      
         x = "44"      
         y = "24"/>
@@ -14,7 +14,7 @@
     <statePointEntry>
       <state      
         class = "com.android.tools.idea.editors.navigation.model.ActivityState"      
-        className = "com.nordicsemi.nrfUARTv2.MainActivity"/>
+        className = "com.teeptrak.controller.MainActivity"/>
       <point      
         x = "860"      
         y = "24"/>

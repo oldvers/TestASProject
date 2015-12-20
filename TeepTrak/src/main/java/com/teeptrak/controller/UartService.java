@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.nordicsemi.nrfUARTv2;
+package com.teeptrak.controller;
 
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;

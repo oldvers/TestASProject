@@ -20,7 +20,7 @@
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.nordicsemi.nrfUARTv2.dfu;
+package com.teeptrak.controller.dfu;
 
 import android.app.Activity;
 

@@ -3,7 +3,7 @@ android {
     compileSdkVersion 18
     buildToolsVersion '23.0.2'
     defaultConfig {
-        applicationId "com.nordicsemi.nrfUARTv2"
+        applicationId "com.teeptrak.controller"
         minSdkVersion 18
         targetSdkVersion 18
     }

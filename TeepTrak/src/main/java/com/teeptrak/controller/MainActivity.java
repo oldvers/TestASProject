@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.nordicsemi.nrfUARTv2;
+package com.teeptrak.controller;
 
 
 
@@ -25,8 +25,8 @@ import java.text.DateFormat;
 import java.util.Date;
 
 
-import com.nordicsemi.nrfUARTv2.UartService;
-import com.nordicsemi.nrfUARTv2.dfu.DfuService;
+import com.teeptrak.controller.UartService;
+import com.teeptrak.controller.dfu.DfuService;
 
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -83,7 +83,7 @@ public class MainActivity extends Activity implements
   private static final int    REQUEST_ENABLE_BT     = 2;
   private static final int    REQUEST_SELECT_FILE   = 3;
   private static final int    UART_PROFILE_READY    = 10;
-  public  static final String TAG = "TeepTracController";
+  public  static final String TAG = "TeepTrakController";
   private static final int    UART_PROFILE_CONNECTED = 20;
   private static final int    UART_PROFILE_DISCONNECTED = 21;
   private static final int    STATE_OFF = 10;

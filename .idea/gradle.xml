@@ -9,7 +9,7 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/nRFUART_Googlev2" />
+            <option value="$PROJECT_DIR$/TeepTrak" />
           </set>
         </option>
       </GradleProjectSettings>

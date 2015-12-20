@@ -19,38 +19,33 @@
  * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.nordicsemi.nrfUARTv2;
+
+package com.teeptrak.controller.dfu;
 
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
+import com.teeptrak.controller.MainActivity;
 
-public class SplashscreenActivity extends Activity
+
+public class NotificationActivity extends Activity
 {
-	/** Splash screen duration time in milliseconds */
-	private static final int DELAY = 1000;
-
 	@Override
-	protected void onCreate(final Bundle savedInstanceState) {
+	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_splashscreen);
 
-		// Jump to SensorsActivity after DELAY milliseconds 
-		new Handler().postDelayed(new Runnable() {
-			@Override
-			public void run() {
-				final Intent intent = new Intent(SplashscreenActivity.this, MainActivity.class);
-				intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
-				startActivity(intent);
-				finish();
-			}
-		}, DELAY);
+		// If this activity is the root activity of the task, the app is not running
+		if (isTaskRoot()) {
+			// Start the app before finishing
+			final Intent parentIntent = new Intent(this, MainActivity.class);
+			parentIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			final Intent startAppIntent = new Intent(this, MainActivity.class);
+			startAppIntent.putExtras(getIntent().getExtras());
+			startActivities(new Intent[] { parentIntent, startAppIntent });
+		}
+
+		// Now finish, which will drop the user in to the activity that was at the top
+		//  of the task stack
+		finish();
 	}
-
-	@Override
-	public void onBackPressed() {
-		// do nothing. Protect from exiting the application when splash screen is shown
-	}
-
 }
