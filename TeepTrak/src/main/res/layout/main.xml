@@ -15,7 +15,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="12dp"
-            android:text="Connect" />
+            android:text="Connect"
+            android:onClick="onConnectDisconnectClicked"/>
     </LinearLayout>
 
     <LinearLayout
@@ -45,7 +46,7 @@
                 android:maxLength="20"
                 android:maxLines="1"
                 android:shadowRadius="1"
-                android:layout_toStartOf="@+id/datButton"/>
+                android:layout_toStartOf="@+id/infoCheckBox"/>
 
             <ListView
                 android:id="@+id/listMessage"
@@ -60,20 +61,31 @@
                 android:id="@+id/sendButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignParentBottom="true"
-                android:layout_alignParentRight="true"
                 android:enabled="false"
-                android:text="Send" />
+                android:text="Send"
+                android:onClick="onSendClicked"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentEnd="true"/>
 
             <Button
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="DAT"
                 android:id="@+id/datButton"
-                android:layout_alignParentBottom="true"
-                android:layout_toStartOf="@+id/sendButton"
                 android:enabled="false"
-                android:focusable="false"/>
+                android:focusable="false"
+                android:onClick="onDATClicked"
+                android:layout_alignParentBottom="true"
+                android:layout_toStartOf="@+id/sendButton"/>
+
+            <CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/infoCheckBox"
+                android:layout_toStartOf="@+id/datButton"
+                android:layout_alignBaseline="@+id/datButton"
+                android:onClick="onInfoLedCheckBoxClicked"
+                android:enabled="false"/>
 
         </RelativeLayout>
     </LinearLayout>
@@ -131,7 +143,7 @@
                 android:text="@string/dfu_setfile"
                 android:id="@+id/setFileButton"
                 android:onClick="onSelectFileClicked"
-                android:enabled="false"/>
+                android:enabled="true"/>
 
             <Button
                 android:layout_width="match_parent"

@@ -63,6 +63,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -103,6 +104,7 @@ public class MainActivity extends Activity implements
 
   private TextView             mDfuState;
   private ProgressBar          mDfuProgress;
+  private CheckBox             mInfoLed;
 
   private String mFilePath;
   private Uri mFileStreamUri;
@@ -152,6 +154,8 @@ public class MainActivity extends Activity implements
     @Override
     public void onDfuCompleted(final String deviceAddress)
     {
+      mDfuProgress.setIndeterminate(false);
+      mDfuProgress.setProgress(0);
       mDfuState.setText(R.string.dfu_status_completed);
 
       // Let's wait a bit until we cancel the notification.
@@ -231,132 +235,38 @@ public class MainActivity extends Activity implements
   @Override
   public void onCreate(Bundle savedInstanceState)
   {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.main);
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.main);
 
-        mBtAdapter = BluetoothAdapter.getDefaultAdapter();
+    mBtAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        if(mBtAdapter == null)
-        {
-            Toast.makeText(this, "Bluetooth is not available", Toast.LENGTH_LONG).show();
-            finish();
-            return;
-        }
+    if(mBtAdapter == null)
+    {
+      Toast.makeText(this, "Bluetooth is not available", Toast.LENGTH_LONG).show();
+      finish();
+      return;
+    }
 
-        messageListView = (ListView) findViewById(R.id.listMessage);
-        listAdapter = new ArrayAdapter<String>(this, R.layout.message_detail);
+    messageListView = (ListView) findViewById(R.id.listMessage);
+    listAdapter = new ArrayAdapter<String>(this, R.layout.message_detail);
 
-        messageListView.setAdapter(listAdapter);
-        messageListView.setDivider(null);
+    messageListView.setAdapter(listAdapter);
+    messageListView.setDivider(null);
 
-        btnConnectDisconnect = (Button) findViewById(R.id.btn_select);
-        btnSend              = (Button) findViewById(R.id.sendButton);
-        btnDAT               = (Button) findViewById(R.id.datButton);
+    btnConnectDisconnect = (Button) findViewById(R.id.btn_select);
+    btnSend              = (Button) findViewById(R.id.sendButton);
+    btnDAT               = (Button) findViewById(R.id.datButton);
+    mRemoteRssiVal       = (TextView) findViewById(R.id.rssival);
 
-        //DFU GUI
-        btnUpgrade           = (Button) findViewById(R.id.datButton);
-        btnSetFile           = (Button) findViewById(R.id.setFileButton);
-        mDfuProgress         = (ProgressBar) findViewById(R.id.dfuProgressBar);
-        mDfuState            = (TextView) findViewById(R.id.dfuStateTextView);
+    //DFU GUI
+    btnUpgrade           = (Button) findViewById(R.id.dfuButton);
+    btnSetFile           = (Button) findViewById(R.id.setFileButton);
+    mDfuProgress         = (ProgressBar) findViewById(R.id.dfuProgressBar);
+    mDfuState            = (TextView) findViewById(R.id.dfuStateTextView);
+    mInfoLed             = (CheckBox) findViewById(R.id.infoCheckBox);
 
-        edtMessage = (EditText) findViewById(R.id.sendText);
-        service_init();
-
-
-
-        // Handler Disconnect & Connect button
-        btnConnectDisconnect.setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View v)
-            {
-                if(!mBtAdapter.isEnabled())
-                {
-                    Log.i(TAG, "onClick - BT not enabled yet");
-                    Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-                    startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
-                } else
-                {
-                    if(btnConnectDisconnect.getText().equals("Connect"))
-                    {
-
-                        //Connect button pressed, open DeviceListActivity class, with popup windows that scan for devices
-
-                        Intent newIntent = new Intent(MainActivity.this, DeviceListActivity.class);
-                        startActivityForResult(newIntent, REQUEST_SELECT_DEVICE);
-                    } else
-                    {
-                        //Disconnect button pressed
-                        if(mDevice != null)
-                        {
-                            mService.disconnect();
-
-                        }
-                    }
-                }
-            }
-        });
-
-        // Handler Send button
-        btnSend.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-            	EditText editText = (EditText) findViewById(R.id.sendText);
-            	String message = editText.getText().toString();
-            	byte[] value;
-				try {
-					//send data to service
-					value = message.getBytes("UTF-8");
-					mService.writeRXCharacteristic(value);
-					//Update the log with time stamp
-					String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-					listAdapter.add("["+currentDateTimeString+"] TX: "+ message);
-               	 	messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
-               	 	edtMessage.setText("");
-				} catch (UnsupportedEncodingException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-
-            }
-        });
-
-
-
-
-
-
-        // Handler DAT Button
-        btnDAT.setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View v)
-            {
-                //EditText editText = (EditText) findViewById(R.id.sendText);
-                String message = "DAT";
-                byte[] value;
-                try
-                {
-                    //send data to service
-                    value = message.getBytes("UTF-8");
-                    mService.writeRXCharacteristic(value);
-                    //Update the log with time stamp
-                    String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-                    listAdapter.add("["+currentDateTimeString+"] TX: "+ message);
-                    messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
-                    edtMessage.setText("");
-                }
-                catch (UnsupportedEncodingException e)
-                {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-
-            }
-        });
-
-        // Set initial UI state
-
+    edtMessage = (EditText) findViewById(R.id.sendText);
+    service_init();
   }
 
   private void printMessage(String aMsg, boolean aInsertDate)
@@ -375,23 +285,25 @@ public class MainActivity extends Activity implements
     messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
   }
 
-    //UART service connected/disconnected
+  //UART service connected/disconnected
   private ServiceConnection mServiceConnection = new ServiceConnection()
   {
-        public void onServiceConnected(ComponentName className, IBinder rawBinder) {
-        		mService = ((UartService.LocalBinder) rawBinder).getService();
-        		Log.d(TAG, "onServiceConnected mService= " + mService);
-        		if (!mService.initialize()) {
-                    Log.e(TAG, "Unable to initialize Bluetooth");
-                    finish();
-                }
+    public void onServiceConnected(ComponentName className, IBinder rawBinder)
+    {
+      mService = ((UartService.LocalBinder) rawBinder).getService();
+      Log.d(TAG, "onServiceConnected mService= " + mService);
+      if (!mService.initialize())
+      {
+        Log.e(TAG, "Unable to initialize Bluetooth");
+        finish();
+      }
+    }
 
-        }
-
-        public void onServiceDisconnected(ComponentName classname) {
-       ////     mService.disconnect(mDevice);
-        		mService = null;
-        }
+    public void onServiceDisconnected(ComponentName classname)
+    {
+      ////mService.disconnect(mDevice);
+      mService = null;
+    }
   };
 
   private Handler mHandler = new Handler()
@@ -425,8 +337,9 @@ public class MainActivity extends Activity implements
             edtMessage.setEnabled(true);
             btnSend.setEnabled(true);
             btnDAT.setEnabled(true);
-            btnSetFile.setEnabled(true);
+            //btnSetFile.setEnabled(true);
             btnUpgrade.setEnabled(true);
+            mInfoLed.setEnabled(true);
             ((TextView) findViewById(R.id.deviceName)).setText(mDevice.getName()+ " - Ready");
             listAdapter.add("["+currentDateTimeString+"] Connected to: "+ mDevice.getName());
          	 	messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
@@ -449,7 +362,8 @@ public class MainActivity extends Activity implements
             btnSend.setEnabled(false);
             btnDAT.setEnabled(false);
             btnUpgrade.setEnabled(false);
-            btnSetFile.setEnabled(false);
+            //btnSetFile.setEnabled(false);
+            mInfoLed.setEnabled(false);
             ((TextView) findViewById(R.id.deviceName)).setText("Not Connected");
             listAdapter.add("["+currentDateTimeString+"] Disconnected to: "+ mDevice.getName());
             mState = UART_PROFILE_DISCONNECTED;
@@ -481,7 +395,6 @@ public class MainActivity extends Activity implements
               String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
               listAdapter.add("["+currentDateTimeString+"] RX: "+text);
               messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
-
             }
             catch (Exception e)
             {
@@ -610,8 +523,35 @@ public class MainActivity extends Activity implements
           mDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress);
 
           Log.d(TAG, "... onActivityResultdevice.address==" + mDevice + "mserviceValue" + mService);
-          ((TextView) findViewById(R.id.deviceName)).setText(mDevice.getName()+ " - connecting");
-          mService.connect(deviceAddress);
+
+          ((TextView) findViewById(R.id.deviceName)).setText(mDevice.getName() + " - connecting");
+
+          if(mDevice.getName().equals("DfuTarg"))
+          {
+            if(mFilePath != null)
+            {
+              final DfuServiceInitiator DFU = new DfuServiceInitiator(mDevice.getAddress())
+                      .setDeviceName(mDevice.getName())
+                      .setKeepBond(false) //keepBond);
+                              //if (mFileType == DfuService.TYPE_AUTO)
+                      .setZip(null, mFilePath);
+
+              //else {
+              //  starter.setBinOrHex(mFileType, mFileStreamUri, mFilePath).setInitFile(mInitFileStreamUri, mInitFilePath);
+              //}
+              DFU.start(this, DfuService.class);
+            }
+            else
+            {
+              printMessage("Selected Device is in DFU mode.", false);
+              printMessage("You must Set FirmWare file first!", false);
+              Toast.makeText(this, "You must Set FirmWare file first!", Toast.LENGTH_SHORT).show();
+            }
+          }
+          else
+          {
+            mService.connect(deviceAddress);
+          }
         }
         break;
 
@@ -720,9 +660,95 @@ public class MainActivity extends Activity implements
 
 
 
+  /************************************************************************************************/
+  /*** Buttons Click Callbacks ********************************************************************/
+  /************************************************************************************************/
+
+  // Handler Disconnect & Connect button
+  public void onConnectDisconnectClicked(final View v)
+  {
+    if(!mBtAdapter.isEnabled())
+    {
+      Log.i(TAG, "onClick - BT not enabled yet");
+      Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+      startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
+    }
+    else
+    {
+      if(btnConnectDisconnect.getText().equals("Connect"))
+      {
+        //Connect button pressed, open DeviceListActivity class, with popup windows that scan for devices
+        Intent newIntent = new Intent(MainActivity.this, DeviceListActivity.class);
+        startActivityForResult(newIntent, REQUEST_SELECT_DEVICE);
+      }
+      else
+      {
+        //Disconnect button pressed
+        if(mDevice != null)
+        {
+          mService.disconnect();
+        }
+      }
+    }
+  }
+
+  // Handler Send button
+  public void onSendClicked(final View v)
+  {
+    String message = edtMessage.getText().toString();
+
+    byte[] value;
+
+    try
+    {
+      //Send Data to Service
+      value = message.getBytes("UTF-8");
+      mService.writeRXCharacteristic(value);
+
+      //Update the log with time stamp
+      String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+      listAdapter.add("["+currentDateTimeString+"] TX: "+ message);
+      messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+
+      edtMessage.setText("");
+    }
+    catch (UnsupportedEncodingException e)
+    {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+  }
 
 
+  // Handler DAT Button
+  public void onDATClicked(final View v)
+  {
+    String message = "DAT";
 
+    byte[] value;
+
+    try
+    {
+      //Send data to service
+      value = message.getBytes("UTF-8");
+      mService.writeRXCharacteristic(value);
+
+      //Update the log with time stamp
+      String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+      listAdapter.add("["+currentDateTimeString+"] TX: "+ message);
+      messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+
+      edtMessage.setText("");
+    }
+    catch (UnsupportedEncodingException e)
+    {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+  }
+
+
+  // Handler Upload Button
   public void onUploadClicked(final View view)
   {
     if (isDfuServiceRunning())
@@ -761,6 +787,47 @@ public class MainActivity extends Activity implements
     //}
     starter.start(this, DfuService.class);
   }
+
+
+  public void onInfoLedCheckBoxClicked(final View view)
+  {
+    String message;
+
+    if(mInfoLed.isChecked())
+    {
+      message = "N5";
+    }
+    else
+    {
+      message = "F5";
+    }
+
+    byte[] value;
+
+    try
+    {
+      //Send data to service
+      value = message.getBytes("UTF-8");
+      mService.writeRXCharacteristic(value);
+
+      //Update the log with time stamp
+      //String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+      //listAdapter.add("["+currentDateTimeString+"] TX: "+ message);
+      //messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+      printMessage("TX: "+ message, true);
+
+      edtMessage.setText("");
+    }
+    catch (UnsupportedEncodingException e)
+    {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+  }
+
+
+
+
 
   private void showUploadCancelDialog()
   {
