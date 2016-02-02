@@ -40,7 +40,8 @@ import java.util.UUID;
  * Service for managing connection and data communication with a GATT server hosted on a
  * given Bluetooth LE device.
  */
-public class UartService extends Service {
+public class UartService extends Service
+{
     private final static String TAG = UartService.class.getSimpleName();
 
     private BluetoothManager mBluetoothManager;
@@ -48,6 +49,7 @@ public class UartService extends Service {
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
     private int mConnectionState = STATE_DISCONNECTED;
+    private int mDiscCount = 0;
 
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
@@ -78,21 +80,27 @@ public class UartService extends Service {
    
     // Implements callback methods for GATT events that the app cares about.  For example,
     // connection change and services discovered.
-    private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
+    private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback()
+    {
         @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState)
+        {
             String intentAction;
             
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
+            if (newState == BluetoothProfile.STATE_CONNECTED)
+            {
                 intentAction = ACTION_GATT_CONNECTED;
                 mConnectionState = STATE_CONNECTED;
                 broadcastUpdate(intentAction);
                 Log.i(TAG, "Connected to GATT server.");
                 // Attempts to discover services after successful connection.
+                mDiscCount = 0;
                 Log.i(TAG, "Attempting to start service discovery:" +
                         mBluetoothGatt.discoverServices());
 
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+            }
+            else if (newState == BluetoothProfile.STATE_DISCONNECTED)
+            {
                 intentAction = ACTION_GATT_DISCONNECTED;
                 mConnectionState = STATE_DISCONNECTED;
                 Log.i(TAG, "Disconnected from GATT server.");
@@ -101,13 +109,33 @@ public class UartService extends Service {
         }
 
         @Override
-        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
+        public void onServicesDiscovered(BluetoothGatt gatt, int status)
+        {
+            if (status == BluetoothGatt.GATT_SUCCESS)
+            {
             	Log.w(TAG, "mBluetoothGatt = " + mBluetoothGatt );
-            	
-                broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
-            } else {
-                Log.w(TAG, "onServicesDiscovered received: " + status);
+
+              if ((gatt.getServices().size() == 0) && (mDiscCount < 3))
+              {
+                mDiscCount++;
+
+                Log.w(TAG, "Restart service discovery... " + gatt.discoverServices());
+
+                return;
+              }
+
+              broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
+            }
+            else
+            {
+              Log.w(TAG, "onServicesDiscovered received: " + status);
+
+              if (mDiscCount < 3)
+              {
+                mDiscCount++;
+
+                Log.w(TAG, "Restart service discovery... " + gatt.discoverServices());
+              }
             }
         }
 

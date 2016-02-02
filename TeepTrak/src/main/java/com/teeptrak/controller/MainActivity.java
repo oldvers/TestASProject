@@ -534,6 +534,7 @@ public class MainActivity extends Activity implements
                       .setDeviceName(mDevice.getName())
                       .setKeepBond(false) //keepBond);
                               //if (mFileType == DfuService.TYPE_AUTO)
+
                       .setZip(null, mFilePath);
 
               //else {

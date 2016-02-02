@@ -85,7 +85,9 @@
                 android:layout_toStartOf="@+id/datButton"
                 android:layout_alignBaseline="@+id/datButton"
                 android:onClick="onInfoLedCheckBoxClicked"
-                android:enabled="false"/>
+                android:enabled="false"
+                android:layout_marginLeft="20dp"
+                android:layout_marginRight="20dp"/>
 
         </RelativeLayout>
     </LinearLayout>

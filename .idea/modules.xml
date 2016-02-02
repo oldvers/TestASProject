@@ -2,8 +2,10 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/DFULibrary/DFULibrary.iml" filepath="$PROJECT_DIR$/DFULibrary/DFULibrary.iml" />
       <module fileurl="file://$PROJECT_DIR$/TeepTrak/TeepTrak.iml" filepath="$PROJECT_DIR$/TeepTrak/TeepTrak.iml" />
-      <module fileurl="file://$PROJECT_DIR$/Test01.iml" filepath="$PROJECT_DIR$/Test01.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Test02.iml" filepath="$PROJECT_DIR$/Test02.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../Test01DfuLibrary/dfu/dfu.iml" filepath="$PROJECT_DIR$/../Test01DfuLibrary/dfu/dfu.iml" />
     </modules>
   </component>
 </project>

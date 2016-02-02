@@ -25,5 +25,6 @@ dependencies {
     compile 'com.android.support:support-v4:18.+'
     compile 'no.nordicsemi.android:log:2.0.0'
     // The DFU Library is imported automatically from jcenter.
-    compile 'no.nordicsemi.android:dfu:0.6.1'
+    //compile 'no.nordicsemi.android:dfu:0.6.1'
+    compile project(':DFULibrary:dfu')
 }
