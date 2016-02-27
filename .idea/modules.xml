@@ -5,7 +5,7 @@
       <module fileurl="file://$PROJECT_DIR$/DFULibrary/DFULibrary.iml" filepath="$PROJECT_DIR$/DFULibrary/DFULibrary.iml" />
       <module fileurl="file://$PROJECT_DIR$/TeepTrak/TeepTrak.iml" filepath="$PROJECT_DIR$/TeepTrak/TeepTrak.iml" />
       <module fileurl="file://$PROJECT_DIR$/Test02.iml" filepath="$PROJECT_DIR$/Test02.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../Test01DfuLibrary/dfu/dfu.iml" filepath="$PROJECT_DIR$/../Test01DfuLibrary/dfu/dfu.iml" />
+      <module fileurl="file://$PROJECT_DIR$/DFULibrary/dfu/dfu.iml" filepath="$PROJECT_DIR$/DFULibrary/dfu/dfu.iml" />
     </modules>
   </component>
 </project>

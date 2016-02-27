@@ -17,15 +17,11 @@
 package com.teeptrak.controller;
 
 
-
-
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.text.DateFormat;
 import java.util.Date;
 
-
-import com.teeptrak.controller.UartService;
 import com.teeptrak.controller.dfu.DfuService;
 
 import android.app.Activity;
@@ -35,7 +31,6 @@ import android.app.LoaderManager.LoaderCallbacks;
 import android.app.NotificationManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothManager;
 
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -48,9 +43,8 @@ import android.content.Loader;
 import android.content.ServiceConnection;
 import android.content.res.Configuration;
 import android.database.Cursor;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -59,13 +53,11 @@ import android.provider.MediaStore;
 import android.support.v4.content.LocalBroadcastManager;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.RadioGroup;
@@ -77,86 +69,113 @@ import no.nordicsemi.android.dfu.DfuProgressListenerAdapter;
 import no.nordicsemi.android.dfu.DfuServiceInitiator;
 import no.nordicsemi.android.dfu.DfuServiceListenerHelper;
 
-public class MainActivity extends Activity implements
-        RadioGroup.OnCheckedChangeListener, LoaderCallbacks<Cursor>
+
+public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
 {
-  private static final int    REQUEST_SELECT_DEVICE = 1;
-  private static final int    REQUEST_ENABLE_BT     = 2;
-  private static final int    REQUEST_SELECT_FILE   = 3;
-  private static final int    UART_PROFILE_READY    = 10;
-  public  static final String TAG = "TeepTrakController";
-  private static final int    UART_PROFILE_CONNECTED = 20;
-  private static final int    UART_PROFILE_DISCONNECTED = 21;
-  private static final int    STATE_OFF = 10;
+  public  static final String  TAG                        = "TeepTrakController";
+  private static final int     REQUEST_SELECT_DEVICE      = 1;
+  private static final int     REQUEST_ENABLE_BT          = 2;
+  private static final int     REQUEST_SELECT_FILE        = 3;
 
-  private static final String EXTRA_URI = "uri";
+  private static final int     TTC_BUSY                   = 10;
+  private static final int     TTC_READY                  = 11;
+  private static final int     UART_PROFILE_CONNECTED     = 20;
+  private static final int     UART_PROFILE_DISCONNECTED  = 21;
 
-  TextView                     mRemoteRssiVal;
-  RadioGroup                   mRg;
-  private int                  mState = UART_PROFILE_DISCONNECTED;
-  private UartService          mService = null;
-  private BluetoothDevice      mDevice = null;
-  private BluetoothAdapter     mBtAdapter = null;
-  private ListView             messageListView;
-  private ArrayAdapter<String> listAdapter;
-  private Button               btnConnectDisconnect, btnSend, btnDAT, btnUpgrade, btnSetFile;
-  private EditText             edtMessage;
+  private static final int     FILE_TYPE_NONE             = -1;
+  private static final int     FILE_TYPE_ZIP              = 1;
+  private static final int     FILE_TYPE_CFG              = 2;
+  private static final int     FILE_TYPE_TST              = 3;
 
-  private TextView             mDfuState;
-  private ProgressBar          mDfuProgress;
-  private CheckBox             mInfoLed;
+  private static final int     STATE_OFF                  = 10;
 
-  private String mFilePath;
-  private Uri mFileStreamUri;
+  private static final String  MIME_TYPE_TEXT             = "text/plain";
+  //private static final String  MIME_TYPE_CFG              = "text/plain";
+  //private static final String  MIME_TYPE_TST              = "text/plain";
 
-  private final DfuProgressListener mDfuProgressListener = new DfuProgressListenerAdapter()
+  private static final String  EXTRA_URI                  = "uri";
+
+  private TextView             mBtDeviceAddress;
+  private int                  mState                     = UART_PROFILE_DISCONNECTED;
+  private UartService          mUartService               = null;
+  private BluetoothDevice      mBtDevice                  = null;
+  private BluetoothAdapter     mBtAdapter                 = null;
+  private ListView             mMsgList;
+  private ArrayAdapter<String> mMsgListAdapter;
+  private Button               mConnectBtn;
+  private Button               mSendBtn;
+  private Button               mDatBtn;
+  private Button               mUpgradeBtn;
+  private Button               mSetFwFileBtn;
+  private Button               mSetCfgFileBtn;
+  private Button               mSetTstFileBtn;
+  private Button               mConfigDeviceBtn;
+  private Button               mTestDeviceBtn;
+  private EditText             mSendMsg;
+
+  private TextView             mStateLabel;
+  private TextView             mBtDeviceName;
+  private ProgressBar          mProgressBar;
+  private CheckBox             mLedBox;
+
+  private Uri                  mFileUri                   = null;
+  private int                  mFileType                  = FILE_TYPE_NONE;
+  private String               mFwFilePath                = null;
+  private String               mCfgFilePath               = null;
+  private String               mTstFilePath               = null;
+
+  private aScriptTask          mScriptTask                = null;
+
+  
+  
+  private final DfuProgressListener mProgressBarListener = new DfuProgressListenerAdapter()
   {
     @Override
     public void onDeviceConnecting(final String deviceAddress)
     {
-      mDfuProgress.setIndeterminate(true);
-      mDfuState.setText(R.string.dfu_status_connecting);
+      mProgressBar.setIndeterminate(true);
+      mStateLabel.setText(R.string.dfu_status_connecting);
       printMessage(getString(R.string.dfu_status_connecting), true);
     }
 
     @Override
     public void onDfuProcessStarting(final String deviceAddress)
     {
-      mDfuProgress.setIndeterminate(true);
-      mDfuState.setText(R.string.dfu_status_starting);
+      mProgressBar.setIndeterminate(true);
+      mStateLabel.setText(R.string.dfu_status_starting);
       printMessage(getString(R.string.dfu_status_starting), true);
     }
 
     @Override
     public void onEnablingDfuMode(final String deviceAddress)
     {
-      mDfuProgress.setIndeterminate(true);
-      mDfuState.setText(R.string.dfu_status_switching_to_dfu);
+      mProgressBar.setIndeterminate(true);
+      mStateLabel.setText(R.string.dfu_status_switching_to_dfu);
       printMessage(getString(R.string.dfu_status_switching_to_dfu), true);
     }
 
     @Override
     public void onFirmwareValidating(final String deviceAddress)
     {
-      mDfuProgress.setIndeterminate(true);
-      mDfuState.setText(R.string.dfu_status_validating);
+      mProgressBar.setIndeterminate(true);
+      mStateLabel.setText(R.string.dfu_status_validating);
       printMessage(getString(R.string.dfu_status_validating), true);
     }
 
     @Override
     public void onDeviceDisconnecting(final String deviceAddress)
     {
-      mDfuProgress.setIndeterminate(true);
-      mDfuState.setText(R.string.dfu_status_disconnecting);
+      mProgressBar.setIndeterminate(true);
+      mStateLabel.setText(R.string.dfu_status_disconnecting);
       printMessage(getString(R.string.dfu_status_disconnecting), true);
     }
 
     @Override
     public void onDfuCompleted(final String deviceAddress)
     {
-      mDfuProgress.setIndeterminate(false);
-      mDfuProgress.setProgress(0);
-      mDfuState.setText(R.string.dfu_status_completed);
+      mProgressBar.setIndeterminate(false);
+      mProgressBar.setProgress(0);
+      mStateLabel.setText(R.string.dfu_status_completed);
 
       // Let's wait a bit until we cancel the notification.
       // When canceled immediately it will be recreated by service again.
@@ -179,7 +198,7 @@ public class MainActivity extends Activity implements
     @Override
     public void onDfuAborted(final String deviceAddress)
     {
-      mDfuState.setText(R.string.dfu_status_aborted);
+      mStateLabel.setText(R.string.dfu_status_aborted);
       // Let's wait a bit until we cancel the notification.
       // When canceled immediately it will be recreated by service again.
       new Handler().postDelayed(new Runnable()
@@ -201,9 +220,9 @@ public class MainActivity extends Activity implements
     @Override
     public void onProgressChanged(final String deviceAddress, final int percent, final float speed, final float avgSpeed, final int currentPart, final int partsTotal)
     {
-      mDfuProgress.setIndeterminate(false);
-      mDfuProgress.setProgress(percent);
-      mDfuState.setText(getString(R.string.dfu_uploading_percentage, percent));
+      mProgressBar.setIndeterminate(false);
+      mProgressBar.setProgress(percent);
+      mStateLabel.setText(getString(R.string.dfu_uploading_percentage, percent));
 
       //if (partsTotal > 1)
       //  mTextUploading.setText(getString(R.string.dfu_status_uploading_part, currentPart, partsTotal));
@@ -215,7 +234,7 @@ public class MainActivity extends Activity implements
     public void onError(final String deviceAddress, final int error, final int errorType, final String message)
     {
       //showErrorMessage(message);
-      mDfuState.setText(getString(R.string.dfu_uploading_error, 0));
+      mStateLabel.setText(getString(R.string.dfu_uploading_error, 0));
       // We have to wait a bit before canceling notification. This is called before DfuService creates the last notification.
       new Handler().postDelayed(new Runnable()
       {
@@ -247,52 +266,53 @@ public class MainActivity extends Activity implements
       return;
     }
 
-    messageListView = (ListView) findViewById(R.id.listMessage);
-    listAdapter = new ArrayAdapter<String>(this, R.layout.message_detail);
+    mConnectBtn       = (Button) findViewById(R.id.idConnectBtn);
+    mBtDeviceName     = (TextView) findViewById(R.id.idDeviceName);
+    mBtDeviceAddress  = (TextView) findViewById(R.id.idDeviceAddress);
+    mStateLabel       = (TextView) findViewById(R.id.idStateLabel);
+    mProgressBar      = (ProgressBar) findViewById(R.id.idProgressBar);
+    mMsgList          = (ListView) findViewById(R.id.idMessageList);
+    mSendMsg          = (EditText) findViewById(R.id.idSendText);
+    mLedBox           = (CheckBox) findViewById(R.id.idLedBox);
+    mDatBtn           = (Button) findViewById(R.id.idDatBtn);
+    mSendBtn          = (Button) findViewById(R.id.idSendBtn);
+    mSetFwFileBtn     = (Button) findViewById(R.id.idSetFwFileBtn);
+    mUpgradeBtn       = (Button) findViewById(R.id.idUpgradeFwBtn);
+    mSetCfgFileBtn    = (Button) findViewById(R.id.idSetCfgFileBtn);
+    mConfigDeviceBtn  = (Button) findViewById(R.id.idCinfigDeviceBtn);
+    mSetTstFileBtn    = (Button) findViewById(R.id.idSetTstFileBtn);
+    mTestDeviceBtn    = (Button) findViewById(R.id.idTestDeviceBtn);
 
-    messageListView.setAdapter(listAdapter);
-    messageListView.setDivider(null);
+    mMsgListAdapter   = new ArrayAdapter<String>(this, R.layout.message_detail);
+    mMsgList.setAdapter(mMsgListAdapter);
+    mMsgList.setDivider(null);
 
-    btnConnectDisconnect = (Button) findViewById(R.id.btn_select);
-    btnSend              = (Button) findViewById(R.id.sendButton);
-    btnDAT               = (Button) findViewById(R.id.datButton);
-    mRemoteRssiVal       = (TextView) findViewById(R.id.rssival);
-
-    //DFU GUI
-    btnUpgrade           = (Button) findViewById(R.id.dfuButton);
-    btnSetFile           = (Button) findViewById(R.id.setFileButton);
-    mDfuProgress         = (ProgressBar) findViewById(R.id.dfuProgressBar);
-    mDfuState            = (TextView) findViewById(R.id.dfuStateTextView);
-    mInfoLed             = (CheckBox) findViewById(R.id.infoCheckBox);
-
-    edtMessage = (EditText) findViewById(R.id.sendText);
-    service_init();
+    initUartService();
   }
 
   private void printMessage(String aMsg, boolean aInsertDate)
   {
-    //Update the log with time stamp
     String dateTime = DateFormat.getTimeInstance().format(new Date());
     if (aInsertDate)
     {
-      listAdapter.add("[" + dateTime + "] " + aMsg);
+      mMsgListAdapter.add("[" + dateTime + "] " + aMsg);
     }
     else
     {
-      listAdapter.add("           " + aMsg);
+      mMsgListAdapter.add("           " + aMsg);
     }
-    //listAdapter.add(aMsg);
-    messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+    mMsgList.smoothScrollToPosition(mMsgListAdapter.getCount() - 1);
   }
 
+
   //UART service connected/disconnected
-  private ServiceConnection mServiceConnection = new ServiceConnection()
+  private ServiceConnection mUartServiceConnection = new ServiceConnection()
   {
     public void onServiceConnected(ComponentName className, IBinder rawBinder)
     {
-      mService = ((UartService.LocalBinder) rawBinder).getService();
-      Log.d(TAG, "onServiceConnected mService= " + mService);
-      if (!mService.initialize())
+      mUartService = ((UartService.LocalBinder) rawBinder).getService();
+      Log.d(TAG, "onServiceConnected mUartService= " + mUartService);
+      if (!mUartService.initialize())
       {
         Log.e(TAG, "Unable to initialize Bluetooth");
         finish();
@@ -301,20 +321,87 @@ public class MainActivity extends Activity implements
 
     public void onServiceDisconnected(ComponentName classname)
     {
-      ////mService.disconnect(mDevice);
-      mService = null;
+      ////mUartService.disconnect(mBtDevice);
+      mUartService = null;
     }
   };
 
   private Handler mHandler = new Handler()
   {
         @Override
-
         //Handler events that received from UART service
-        public void handleMessage(Message msg) {
+        public void handleMessage(Message msg)
+        {
 
         }
   };
+
+  private void setUIState(int aState)
+  {
+    switch(aState)
+    {
+      case UART_PROFILE_CONNECTED:
+        mConnectBtn.setText("Disconnect");
+        mConnectBtn.setEnabled(true);
+        mStateLabel.setText("Connected");
+        mSendMsg.setEnabled(true);
+        mSendBtn.setEnabled(true);
+        mDatBtn.setEnabled(true);
+        mSetFwFileBtn.setEnabled(true);
+        mUpgradeBtn.setEnabled(true);
+        mSetCfgFileBtn.setEnabled(true);
+        mConfigDeviceBtn.setEnabled(true);
+        mSetTstFileBtn.setEnabled(true);
+        mTestDeviceBtn.setEnabled(true);
+        mLedBox.setEnabled(true);
+        break;
+      case UART_PROFILE_DISCONNECTED:
+        mConnectBtn.setText("Connect");
+        mConnectBtn.setEnabled(true);
+        mStateLabel.setText("Disconnected");
+        mSendMsg.setEnabled(false);
+        mSendBtn.setEnabled(false);
+        mDatBtn.setEnabled(false);
+        mSetFwFileBtn.setEnabled(true);
+        mUpgradeBtn.setEnabled(false);
+        mSetCfgFileBtn.setEnabled(true);
+        mConfigDeviceBtn.setEnabled(false);
+        mSetTstFileBtn.setEnabled(true);
+        mTestDeviceBtn.setEnabled(false);
+        mLedBox.setEnabled(false);
+        break;
+      case TTC_BUSY:
+        mConnectBtn.setText("Disconnect");
+        mConnectBtn.setEnabled(false);
+        mStateLabel.setText("Connected -> Busy");
+        mSendMsg.setEnabled(false);
+        mSendBtn.setEnabled(false);
+        mDatBtn.setEnabled(false);
+        mSetFwFileBtn.setEnabled(false);
+        mUpgradeBtn.setEnabled(false);
+        mSetCfgFileBtn.setEnabled(false);
+        mConfigDeviceBtn.setEnabled(false);
+        mSetTstFileBtn.setEnabled(false);
+        mTestDeviceBtn.setEnabled(false);
+        mLedBox.setEnabled(false);
+        break;
+      case TTC_READY:
+        mConnectBtn.setText("Disconnect");
+        mConnectBtn.setEnabled(true);
+        mStateLabel.setText("Connected -> Ready");
+        mSendMsg.setEnabled(true);
+        mSendBtn.setEnabled(true);
+        mDatBtn.setEnabled(true);
+        mSetFwFileBtn.setEnabled(true);
+        mUpgradeBtn.setEnabled(true);
+        mSetCfgFileBtn.setEnabled(true);
+        mConfigDeviceBtn.setEnabled(true);
+        mSetTstFileBtn.setEnabled(true);
+        mTestDeviceBtn.setEnabled(true);
+        mLedBox.setEnabled(true);
+        break;
+    }
+  }
 
   private final BroadcastReceiver UARTStatusChangeReceiver = new BroadcastReceiver()
   {
@@ -331,44 +418,39 @@ public class MainActivity extends Activity implements
         {
           public void run()
           {
-            String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
             Log.d(TAG, "UART_CONNECT_MSG");
-            btnConnectDisconnect.setText("Disconnect");
-            edtMessage.setEnabled(true);
-            btnSend.setEnabled(true);
-            btnDAT.setEnabled(true);
-            //btnSetFile.setEnabled(true);
-            btnUpgrade.setEnabled(true);
-            mInfoLed.setEnabled(true);
-            ((TextView) findViewById(R.id.deviceName)).setText(mDevice.getName()+ " - Ready");
-            listAdapter.add("["+currentDateTimeString+"] Connected to: "+ mDevice.getName());
-         	 	messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+
+            mBtDeviceName.setText(mBtDevice.getName() + " - Ready");
+            mBtDeviceAddress.setText(mBtDevice.getAddress());
+
+            printMessage("Connected to: " + mBtDevice.getName(), true);
+
             mState = UART_PROFILE_CONNECTED;
+
+            setUIState(mState);
           }
         });
       }
 
       //*********************//
-      if (action.equals(UartService.ACTION_GATT_DISCONNECTED))
+      if(action.equals(UartService.ACTION_GATT_DISCONNECTED))
       {
         runOnUiThread(new Runnable()
         {
           public void run()
           {
-            String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
             Log.d(TAG, "UART_DISCONNECT_MSG");
-            btnConnectDisconnect.setText("Connect");
-            edtMessage.setEnabled(false);
-            btnSend.setEnabled(false);
-            btnDAT.setEnabled(false);
-            btnUpgrade.setEnabled(false);
-            //btnSetFile.setEnabled(false);
-            mInfoLed.setEnabled(false);
-            ((TextView) findViewById(R.id.deviceName)).setText("Not Connected");
-            listAdapter.add("["+currentDateTimeString+"] Disconnected to: "+ mDevice.getName());
+
+            mBtDeviceName.setText("Not Connected");
+            mBtDeviceAddress.setText("-");
+
+            printMessage("Disconnected to: " + mBtDevice.getName(), true);
+
+            mUartService.close();
+
             mState = UART_PROFILE_DISCONNECTED;
-            mService.close();
-            //setUiState();
+
+            setUIState(mState);
           }
         });
       }
@@ -377,31 +459,41 @@ public class MainActivity extends Activity implements
       //*********************//
       if (action.equals(UartService.ACTION_GATT_SERVICES_DISCOVERED))
       {
-        mService.enableTXNotification();
+        mUartService.enableTXNotification();
       }
 
 
       //*********************//
       if (action.equals(UartService.ACTION_DATA_AVAILABLE))
       {
-        final byte[] txValue = intent.getByteArrayExtra(UartService.EXTRA_DATA);
-        runOnUiThread(new Runnable()
+        final byte[] mRxValue = intent.getByteArrayExtra(UartService.EXTRA_DATA);
+
+        if (mScriptTask != null)
         {
-          public void run()
+          mScriptTask.putRxData(mRxValue);
+
+          synchronized(mScriptTask)
           {
-            try
-            {
-              String text = new String(txValue, "UTF-8");
-              String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-              listAdapter.add("["+currentDateTimeString+"] RX: "+text);
-              messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
-            }
-            catch (Exception e)
-            {
-              Log.e(TAG, e.toString());
-            }
+            mScriptTask.notify();
           }
-        });
+        }
+        else
+        {
+          runOnUiThread(new Runnable()
+          {
+            public void run()
+            {
+              try
+              {
+                String mText = new String(mRxValue, "UTF-8");
+                printMessage("RX: " + mText, true);
+              } catch(Exception e)
+              {
+                Log.e(TAG, e.toString());
+              }
+            }
+          });
+        }
       }
 
 
@@ -409,16 +501,16 @@ public class MainActivity extends Activity implements
       if (action.equals(UartService.DEVICE_DOES_NOT_SUPPORT_UART))
       {
        	showMessage("Device doesn't support UART. Disconnecting");
-      	mService.disconnect();
+      	mUartService.disconnect();
       }
 
     }
   };
 
-  private void service_init()
+  private void initUartService()
   {
     Intent bindIntent = new Intent(this, UartService.class);
-    bindService(bindIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
+    bindService(bindIntent, mUartServiceConnection, Context.BIND_AUTO_CREATE);
 
     LocalBroadcastManager.getInstance(this).registerReceiver(UARTStatusChangeReceiver, makeGattUpdateIntentFilter());
   }
@@ -445,18 +537,22 @@ public class MainActivity extends Activity implements
   @Override
   public void onDestroy()
   {
-    	 super.onDestroy();
-        Log.d(TAG, "onDestroy()");
+  	 super.onDestroy();
 
-        try {
-        	LocalBroadcastManager.getInstance(this).unregisterReceiver(UARTStatusChangeReceiver);
-        } catch (Exception ignore) {
-            Log.e(TAG, ignore.toString());
-        }
-        unbindService(mServiceConnection);
-        mService.stopSelf();
-      mService= null;
+     Log.d(TAG, "onDestroy()");
 
+     try
+     {
+      	LocalBroadcastManager.getInstance(this).unregisterReceiver(UARTStatusChangeReceiver);
+     }
+     catch (Exception ignore)
+     {
+        Log.e(TAG, ignore.toString());
+     }
+
+     unbindService(mUartServiceConnection);
+     mUartService.stopSelf();
+     mUartService= null;
   }
 
 
@@ -473,7 +569,7 @@ public class MainActivity extends Activity implements
   {
     Log.d(TAG, "onPause");
     super.onPause();
-    DfuServiceListenerHelper.unregisterProgressListener(this, mDfuProgressListener);
+    DfuServiceListenerHelper.unregisterProgressListener(this, mProgressBarListener);
   }
 
 
@@ -489,8 +585,10 @@ public class MainActivity extends Activity implements
   public void onResume()
   {
     super.onResume();
+
     Log.d(TAG, "onResume");
-    DfuServiceListenerHelper.registerProgressListener(this, mDfuProgressListener);
+
+    DfuServiceListenerHelper.registerProgressListener(this, mProgressBarListener);
 
     if (!mBtAdapter.isEnabled())
     {
@@ -511,58 +609,56 @@ public class MainActivity extends Activity implements
   @Override
   public void onActivityResult(int requestCode, int resultCode, Intent data)
   {
-    //if(resultCode != RESULT_OK) return;
-
     switch (requestCode)
     {
       case REQUEST_SELECT_DEVICE:
+      {
         //When the DeviceListActivity return, with the selected device address
-        if (resultCode == Activity.RESULT_OK && data != null)
+        if(resultCode == Activity.RESULT_OK && data != null)
         {
           String deviceAddress = data.getStringExtra(BluetoothDevice.EXTRA_DEVICE);
-          mDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress);
+          mBtDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress);
 
-          Log.d(TAG, "... onActivityResultdevice.address==" + mDevice + "mserviceValue" + mService);
+          Log.d(TAG, "... onActivityResultdevice.address==" + mBtDevice + "mserviceValue" + mUartService);
 
-          ((TextView) findViewById(R.id.deviceName)).setText(mDevice.getName() + " - connecting");
+          mBtDeviceName.setText(mBtDevice.getName() + " - Connecting");
 
-          if(mDevice.getName().equals("DfuTarg"))
+          if(mBtDevice.getName().equals("DfuTarg"))
           {
-            if(mFilePath != null)
+            if(mFwFilePath != null)
             {
-              final DfuServiceInitiator DFU = new DfuServiceInitiator(mDevice.getAddress())
-                      .setDeviceName(mDevice.getName())
+              final DfuServiceInitiator DFU = new DfuServiceInitiator(mBtDevice.getAddress())
+                      .setDeviceName(mBtDevice.getName())
                       .setKeepBond(false) //keepBond);
                               //if (mFileType == DfuService.TYPE_AUTO)
 
-                      .setZip(null, mFilePath);
+                      .setZip(null, mFwFilePath);
 
               //else {
               //  starter.setBinOrHex(mFileType, mFileStreamUri, mFilePath).setInitFile(mInitFileStreamUri, mInitFilePath);
               //}
               DFU.start(this, DfuService.class);
-            }
-            else
+            } else
             {
               printMessage("Selected Device is in DFU mode.", false);
               printMessage("You must Set FirmWare file first!", false);
               Toast.makeText(this, "You must Set FirmWare file first!", Toast.LENGTH_SHORT).show();
             }
-          }
-          else
+          } else
           {
-            mService.connect(deviceAddress);
+            mUartService.connect(deviceAddress);
           }
         }
         break;
+      }
 
       case REQUEST_ENABLE_BT:
+      {
         // When the request to enable Bluetooth returns
-        if (resultCode == Activity.RESULT_OK)
+        if(resultCode == Activity.RESULT_OK)
         {
           Toast.makeText(this, "Bluetooth has turned on ", Toast.LENGTH_SHORT).show();
-        }
-        else
+        } else
         {
           // User did not enable Bluetooth or an error occurred
           Log.d(TAG, "BT not enabled");
@@ -570,59 +666,71 @@ public class MainActivity extends Activity implements
           finish();
         }
         break;
+      }
 
       case REQUEST_SELECT_FILE:
-        // clear previous data
-        //mFileType = mFileTypeTmp;
-        mFilePath = null;
-        mFileStreamUri = null;
+      {
+        // Clear previous data
+        mFwFilePath = null;
+        mCfgFilePath = null;
+        mTstFilePath = null;
+        mFileUri = null;
 
-        // and read new one
+        // Read new one
         final Uri uri = data.getData();
 			  /*
-			   * The URI returned from application may be in 'file' or 'content' schema. 'File' schema allows us to create a File object and read details from if
-			   * directly. Data from 'Content' schema must be read by Content Provider. To do that we are using a Loader.
+			   * The URI returned from application may be in 'file' or 'content' schema.
+			   * 'File' schema allows us to create a File object and read details from it
+			   * directly. Data from 'Content' schema must be read by Content Provider.
+			   * To do that we are using a Loader.
 			   */
-        if (uri.getScheme().equals("file"))
+        if(uri.getScheme().equals("file"))
         {
           // the direct path to the file has been returned
           final String path = uri.getPath();
           final File file = new File(path);
-          mFilePath = path;
 
-          //printMessage("Set File Action :", true);
-          //printMessage("           Path = " + mFilePath, false);
+          switch(mFileType)
+          {
+            case FILE_TYPE_ZIP:
+              mFwFilePath = path;
+              break;
+            case FILE_TYPE_CFG:
+              mCfgFilePath = path;
+              break;
+            case FILE_TYPE_TST:
+              mTstFilePath = path;
+              break;
+            case FILE_TYPE_NONE:
+            default:
+              break;
+          }
 
-          updateFileInfo(file.getName(), file.length(), mFilePath);
+          updateFileInfo(file.getName(), file.length(), path, mFileType);
         }
-        else if (uri.getScheme().equals("content"))
+        else if(uri.getScheme().equals("content"))
         {
           // an Uri has been returned
-          mFileStreamUri = uri;
-          // if application returned Uri for streaming, let's us it. Does it works?
-          // FIXME both Uris works with Google Drive app. Why both? What's the difference? How about other apps like DropBox?
+          mFileUri = uri;
+          // If application returned Uri for streaming, let's use it. Does it works?
+          // FIXME both Uris works with Google Drive app. Why both? What's the difference?
+          // How about other apps like DropBox?
           final Bundle extras = data.getExtras();
-          if (extras != null && extras.containsKey(Intent.EXTRA_STREAM))
-               mFileStreamUri = extras.getParcelable(Intent.EXTRA_STREAM);
+          if(extras != null && extras.containsKey(Intent.EXTRA_STREAM))
+              mFileUri = extras.getParcelable(Intent.EXTRA_STREAM);
 
-          // file name and size must be obtained from Content Provider
+          // File name and size must be obtained from Content Provider
           final Bundle bundle = new Bundle();
           bundle.putParcelable(EXTRA_URI, uri);
           getLoaderManager().restartLoader(REQUEST_SELECT_FILE, bundle, this);
         }
         break;
+      }
 
       default:
         Log.e(TAG, "wrong request code");
         break;
     }
-  }
-
-
-  @Override
-  public void onCheckedChanged(RadioGroup group, int checkedId)
-  {
-    //
   }
 
 
@@ -635,28 +743,31 @@ public class MainActivity extends Activity implements
   @Override
   public void onBackPressed()
   {
-        if (mState == UART_PROFILE_CONNECTED) {
-            Intent startMain = new Intent(Intent.ACTION_MAIN);
-            startMain.addCategory(Intent.CATEGORY_HOME);
-            startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(startMain);
-            showMessage("nRFUART's running in background.\n             Disconnect to exit");
-        }
-        else {
-            new AlertDialog.Builder(this)
+    if (mState == UART_PROFILE_CONNECTED)
+    {
+      Intent startMain = new Intent(Intent.ACTION_MAIN);
+      startMain.addCategory(Intent.CATEGORY_HOME);
+      startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+      startActivity(startMain);
+      showMessage("nRFUART's running in background.\n             Disconnect to exit");
+    }
+    else
+    {
+      new AlertDialog.Builder(this)
             .setIcon(android.R.drawable.ic_dialog_alert)
             .setTitle(R.string.popup_title)
             .setMessage(R.string.popup_message)
             .setPositiveButton(R.string.popup_yes, new DialogInterface.OnClickListener()
-                {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-   	                finish();
-                }
-            })
+      {
+        @Override
+        public void onClick(DialogInterface dialog, int which)
+        {
+   	      finish();
+        }
+      })
             .setNegativeButton(R.string.popup_no, null)
             .show();
-        }
+    }
   }
 
 
@@ -666,7 +777,7 @@ public class MainActivity extends Activity implements
   /************************************************************************************************/
 
   // Handler Disconnect & Connect button
-  public void onConnectDisconnectClicked(final View v)
+  public void onConnectBtnClicked(final View v)
   {
     if(!mBtAdapter.isEnabled())
     {
@@ -676,7 +787,7 @@ public class MainActivity extends Activity implements
     }
     else
     {
-      if(btnConnectDisconnect.getText().equals("Connect"))
+      if(mConnectBtn.getText().equals("Connect"))
       {
         //Connect button pressed, open DeviceListActivity class, with popup windows that scan for devices
         Intent newIntent = new Intent(MainActivity.this, DeviceListActivity.class);
@@ -685,18 +796,18 @@ public class MainActivity extends Activity implements
       else
       {
         //Disconnect button pressed
-        if(mDevice != null)
+        if(mBtDevice != null)
         {
-          mService.disconnect();
+          mUartService.disconnect();
         }
       }
     }
   }
 
   // Handler Send button
-  public void onSendClicked(final View v)
+  public void onSendBtnClicked(final View v)
   {
-    String message = edtMessage.getText().toString();
+    String message = mSendMsg.getText().toString();
 
     byte[] value;
 
@@ -704,14 +815,14 @@ public class MainActivity extends Activity implements
     {
       //Send Data to Service
       value = message.getBytes("UTF-8");
-      mService.writeRXCharacteristic(value);
+      mUartService.writeRXCharacteristic(value);
 
       //Update the log with time stamp
       String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-      listAdapter.add("["+currentDateTimeString+"] TX: "+ message);
-      messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+      mMsgListAdapter.add("["+currentDateTimeString+"] TX: "+ message);
+      mMsgList.smoothScrollToPosition(mMsgListAdapter.getCount() - 1);
 
-      edtMessage.setText("");
+      mSendMsg.setText("");
     }
     catch (UnsupportedEncodingException e)
     {
@@ -722,7 +833,7 @@ public class MainActivity extends Activity implements
 
 
   // Handler DAT Button
-  public void onDATClicked(final View v)
+  public void onDatBtnClicked(final View v)
   {
     String message = "DAT";
 
@@ -732,14 +843,14 @@ public class MainActivity extends Activity implements
     {
       //Send data to service
       value = message.getBytes("UTF-8");
-      mService.writeRXCharacteristic(value);
+      mUartService.writeRXCharacteristic(value);
 
       //Update the log with time stamp
       String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-      listAdapter.add("["+currentDateTimeString+"] TX: "+ message);
-      messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+      mMsgListAdapter.add("["+currentDateTimeString+"] TX: "+ message);
+      mMsgList.smoothScrollToPosition(mMsgListAdapter.getCount() - 1);
 
-      edtMessage.setText("");
+      mSendMsg.setText("");
     }
     catch (UnsupportedEncodingException e)
     {
@@ -750,11 +861,17 @@ public class MainActivity extends Activity implements
 
 
   // Handler Upload Button
-  public void onUploadClicked(final View view)
+  public void onUpgradeBtnClicked(final View view)
   {
     if (isDfuServiceRunning())
     {
       showUploadCancelDialog();
+      return;
+    }
+
+    if (mFwFilePath == null)
+    {
+      printMessage("ERROR: Wrong FirmWare File!", true);
       return;
     }
 
@@ -778,11 +895,11 @@ public class MainActivity extends Activity implements
 
       //final boolean keepBond = preferences.getBoolean(SettingsFragment.SETTINGS_KEEP_BOND, false);
 
-    final DfuServiceInitiator starter = new DfuServiceInitiator(mDevice.getAddress())
-            .setDeviceName(mDevice.getName())
+    final DfuServiceInitiator starter = new DfuServiceInitiator(mBtDevice.getAddress())
+            .setDeviceName(mBtDevice.getName())
             .setKeepBond(false) //keepBond);
     //if (mFileType == DfuService.TYPE_AUTO)
-            .setZip(null, mFilePath);
+            .setZip(null, mFwFilePath);
     //else {
     //  starter.setBinOrHex(mFileType, mFileStreamUri, mFilePath).setInitFile(mInitFileStreamUri, mInitFilePath);
     //}
@@ -790,11 +907,11 @@ public class MainActivity extends Activity implements
   }
 
 
-  public void onInfoLedCheckBoxClicked(final View view)
+  public void onLedBoxClicked(final View view)
   {
     String message;
 
-    if(mInfoLed.isChecked())
+    if(mLedBox.isChecked())
     {
       message = "N5";
     }
@@ -807,17 +924,12 @@ public class MainActivity extends Activity implements
 
     try
     {
-      //Send data to service
       value = message.getBytes("UTF-8");
-      mService.writeRXCharacteristic(value);
+      mUartService.writeRXCharacteristic(value);
 
-      //Update the log with time stamp
-      //String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-      //listAdapter.add("["+currentDateTimeString+"] TX: "+ message);
-      //messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
       printMessage("TX: "+ message, true);
 
-      edtMessage.setText("");
+      mSendMsg.setText("");
     }
     catch (UnsupportedEncodingException e)
     {
@@ -825,9 +937,6 @@ public class MainActivity extends Activity implements
       e.printStackTrace();
     }
   }
-
-
-
 
 
   private void showUploadCancelDialog()
@@ -880,8 +989,10 @@ public class MainActivity extends Activity implements
     //mFileNameView.setText(null);
     //mFileTypeView.setText(null);
     //mFileSizeView.setText(null);
-    mFilePath = null;
-    mFileStreamUri = null;
+    mFwFilePath = null;
+    mCfgFilePath = null;
+    mTstFilePath = null;
+    mFileUri = null;
     //mStatusOk = false;
   }
 
@@ -898,49 +1009,73 @@ public class MainActivity extends Activity implements
       String filePath = null;
       final int dataIndex = data.getColumnIndex(MediaStore.MediaColumns.DATA);
       if (dataIndex != -1)
+      {
         filePath = data.getString(dataIndex /* 2 DATA */);
+      }
       if (!TextUtils.isEmpty(filePath))
-        mFilePath = filePath;
+      {
+        switch(mFileType)
+        {
+          case FILE_TYPE_ZIP:
+            mFwFilePath = filePath;
+            break;
+          case FILE_TYPE_CFG:
+            mCfgFilePath = filePath;
+            break;
+          case FILE_TYPE_TST:
+            mTstFilePath = filePath;
+            break;
+          case FILE_TYPE_NONE:
+          default:
+            break;
+        }
+      }
 
-      updateFileInfo(fileName, fileSize, mFilePath);
+      updateFileInfo(fileName, fileSize, filePath, mFileType);
     }
     else
     {
       //mFileNameView.setText(null);
       //mFileTypeView.setText(null);
       //mFileSizeView.setText(null);
-      mFilePath = null;
-      mFileStreamUri = null;
+      mFwFilePath = null;
+      mCfgFilePath = null;
+      mTstFilePath = null;
+      mFileUri = null;
       //mFileStatusView.setText(R.string.dfu_file_status_error);
       //mStatusOk = false;
     }
   }
 
 
-  private void updateFileInfo(final String fileName, final long fileSize, final String filePath)
+  private void updateFileInfo(String aFileName, long aFileSize, String aFilePath, int aFileType)
   {
+    String mType;
+
     //mFileNameView.setText(fileName);
-    //switch (fileType) {
-    //  case DfuService.TYPE_AUTO:
-    //    mFileTypeView.setText(getResources().getStringArray(R.array.dfu_file_type)[0]);
-    //    break;
-    //  case DfuService.TYPE_SOFT_DEVICE:
-    //    mFileTypeView.setText(getResources().getStringArray(R.array.dfu_file_type)[1]);
-    //    break;
-    //  case DfuService.TYPE_BOOTLOADER:
-    //    mFileTypeView.setText(getResources().getStringArray(R.array.dfu_file_type)[2]);
-    //    break;
-    //  case DfuService.TYPE_APPLICATION:
-    //    mFileTypeView.setText(getResources().getStringArray(R.array.dfu_file_type)[3]);
-    //    break;
-    //}
+    switch(aFileType)
+    {
+      case FILE_TYPE_ZIP:
+        mType = "ZIP";
+        break;
+      case FILE_TYPE_CFG:
+        mType = "CFG";
+        break;
+      case FILE_TYPE_TST:
+        mType = "TST";
+        break;
+      case FILE_TYPE_NONE:
+      default:
+        mType  = "NONE";
+        break;
+    }
     //mFileSizeView.setText(getString(R.string.dfu_file_size_text, fileSize));
     //printMessage("Set File Action :", true);
 
-    printMessage("- Name = " + fileName, false);
-    printMessage("- Type = " + "ZIP", false);
-    printMessage("- Path = " + filePath, false);
-    printMessage("- Size = " + fileSize + " Bytes", false);
+    printMessage("- Path = " + aFilePath, false);
+    printMessage("- Name = " + aFileName, false);
+    printMessage("- Size = " + aFileSize + " Bytes", false);
+    printMessage("- Type = " + mType, false);
 
     //final String extension = mFileType == DfuService.TYPE_AUTO ? "(?i)ZIP" : "(?i)HEX|BIN"; // (?i) =  case insensitive
     //final boolean statusOk = mStatusOk = MimeTypeMap.getFileExtensionFromUrl(fileName).matches(extension);
@@ -979,9 +1114,9 @@ public class MainActivity extends Activity implements
    *
    * @param view a button that was pressed
    */
-  public void onSelectFileClicked(final View view)
+  public void onSetFwFileBtnClicked(final View view)
   {
-    printMessage("Set File Action Performed :", true);
+    printMessage("Set FirmWare File Action Performed", true);
     //printMessage("           Path = " + mFilePath, false);
     //mFileTypeTmp = mFileType;
     //int index = 0;
@@ -1023,7 +1158,8 @@ public class MainActivity extends Activity implements
     //        }).setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
     //  @Override
     //  public void onClick(final DialogInterface dialog, final int which) {
-        openFileChooser();
+      mFileType = FILE_TYPE_ZIP;
+      //openFileChooser(mFileType);
     //  }
     //}).setNeutralButton(R.string.dfu_file_info, new DialogInterface.OnClickListener() {
     //  @Override
@@ -1032,13 +1168,18 @@ public class MainActivity extends Activity implements
     //    fragment.show(getSupportFragmentManager(), "help_fragment");
     //  }
     //}).setNegativeButton(R.string.cancel, null).show();
+
+    OpenFileDialog mFileDialog = new OpenFileDialog(this)
+            .setFilter(".*\\.zip")
+            .setOpenDialogListener(new OpenFileListener());
+    mFileDialog.show();
   }
 
-  private void openFileChooser()
+  private void openFileChooser(int aFileType)
   {
     final Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-    //intent.setType(mFileTypeTmp == DfuService.TYPE_AUTO ? DfuService.MIME_TYPE_ZIP : DfuService.MIME_TYPE_OCTET_STREAM);
-    intent.setType(DfuService.MIME_TYPE_ZIP);
+    intent.setType(aFileType == FILE_TYPE_ZIP ? DfuService.MIME_TYPE_ZIP : MIME_TYPE_TEXT);
+    //intent.setType(DfuService.MIME_TYPE_ZIP);
     intent.addCategory(Intent.CATEGORY_OPENABLE);
 
     if (intent.resolveActivity(getPackageManager()) != null)
@@ -1072,5 +1213,372 @@ public class MainActivity extends Activity implements
     //    }
     //  }).show();
     //}
+  }
+
+
+  public void onSetCfgFileBtnClicked(final View view)
+  {
+    printMessage("Set Config File Action Performed", true);
+    mFileType = FILE_TYPE_CFG;
+    //openFileChooser(mFileType);
+
+    //mScriptTask = new aScriptTask();
+    //mScriptTask.execute("");
+
+    OpenFileDialog mFileDialog = new OpenFileDialog(this)
+            .setFilter(".*\\.cfg")
+            .setOpenDialogListener(new OpenFileListener());
+    mFileDialog.show();
+  }
+
+  public void onSetTstFileBtnClicked(final View view)
+  {
+    printMessage("Set Testing File Action Performed :", true);
+    mFileType = FILE_TYPE_TST;
+    //openFileChooser(mFileType);
+
+    //final byte[] mRxValue = new byte[8];
+    //mRxValue[0] = 'R';
+    //mRxValue[1] = 'X';
+    //mRxValue[2] = 'V';
+    //mRxValue[3] = 'A';
+    //mRxValue[4] = 'L';
+    //mRxValue[5] = '1';
+    //mRxValue[6] = '2';
+    //mRxValue[7] = '3';
+
+    //if (mScriptTask != null)
+    //{
+    //  mScriptTask.putRxData(mRxValue);
+
+    //  synchronized(mScriptTask)
+    //  {
+    //    mScriptTask.notify();
+    //  }
+    //}
+
+    OpenFileDialog mFileDialog = new OpenFileDialog(this)
+            .setFilter(".*\\.tst")
+            .setOpenDialogListener(new OpenFileListener());
+    mFileDialog.show();
+  }
+
+  /************************************************************************************************/
+  /* Configuration/Testing Task */
+  /************************************************************************************************/
+
+  public class aScriptTask extends AsyncTask<String, String, String>
+  {
+    private final int  MODE_IDLE     = 0;
+    private final int  MODE_CONFIG   = 1;
+    private final int  MODE_TEST     = 2;
+    private String     cTag          = "ScriptTask";
+    private String     cRxData       = null;
+    private String     cRxMsg;
+    private byte[]     cTxBuffer;
+    private int        cMode         = MODE_IDLE;
+    private FileParser cParser       = null;
+    private int        cCmdCount     = 0;
+    private int        cCmdIndex     = 0;
+
+    public synchronized void putRxData(byte[] aData)
+    {
+      //final byte[] mRxValue = intent.getByteArrayExtra(UartService.EXTRA_DATA);
+
+      //if (mScriptTask != null)
+      //{
+      //  synchronized(mScriptTask)
+      //  {
+      //    mScriptTask.notify();
+      //  }
+      //}
+
+      try
+      {
+        cRxData = new String(aData, "UTF-8");
+        Log.d(cTag, "Data Received -> " + cRxData);
+      }
+      catch(UnsupportedEncodingException e)
+      {
+        cRxData = null;
+        Log.d(cTag, "Exception occured while data receiving: " + e.getMessage());
+      }
+    }
+
+    private synchronized boolean sendMessage(String aMessage)
+    {
+      try
+      {
+        cTxBuffer = aMessage.getBytes("UTF-8");
+        mUartService.writeRXCharacteristic(cTxBuffer);
+        publishProgress("TX: " + aMessage);
+        return true;
+      }
+      catch (UnsupportedEncodingException e)
+      {
+        Log.d(cTag, "Error while data send" + e.getMessage());
+        return false;
+      }
+    }
+
+    private String readMessage(int aTimeout)
+    {
+      cRxData = null;
+      try
+      {
+        this.wait(aTimeout);
+        if (cRxData != null)
+        {
+          publishProgress("RX: " + cRxData);
+          Log.d(cTag, "Data Received: " + cRxData);
+        }
+        return cRxData;
+      }
+      catch (Exception e)
+      {
+        Log.d(cTag, "Read Message Exception Occured" + e.getMessage());
+        return null;
+      }
+    }
+
+    private void delay(int aTimeout, boolean aLog)
+    {
+      if(aTimeout == 0) return;
+
+      try
+      {
+        if(aLog) publishProgress("P: " + aTimeout + " ms");
+        Thread.sleep(aTimeout);
+      }
+      catch(InterruptedException e)
+      {
+        return;
+      }
+    }
+
+    @Override
+    protected void onPreExecute()
+    {
+      super.onPreExecute();
+
+      switch(mFileType)
+      {
+        case FILE_TYPE_CFG:
+          cMode = MODE_CONFIG;
+          printMessage("Device configuration started...", true);
+          break;
+        case FILE_TYPE_TST:
+          cMode = MODE_TEST;
+          printMessage("Device testing started...", true);
+          break;
+        default:
+          cMode = MODE_IDLE;
+          printMessage("Wrong file!", true);
+          break;
+      }
+
+      setUIState(TTC_BUSY);
+
+      mProgressBar.setIndeterminate(true);
+      mProgressBar.setProgress(0);
+
+      Log.d(cTag, "Do Pre Execute : Server = ");
+    }
+
+    @Override
+    protected synchronized String doInBackground(String... message)
+    {
+      Log.d(cTag, "Do In Background...");
+
+      publishProgress(" - File = " + message[0]);
+
+      switch(cMode)
+      {
+        case MODE_CONFIG:
+          cParser = new ConfigFileParser(message[0]);
+          break;
+        case MODE_TEST:
+          cParser = new TestFileParser(message[0]);
+          break;
+        case MODE_IDLE:
+        default:
+          return null;
+      }
+
+      if(!cParser.isValid()) return null;
+
+      publishProgress(" - File Version = " + cParser.getFileVersion());
+
+      /********************************************/
+      publishProgress("SoftWare Version Request...");
+
+      if(!sendMessage("VS")) return null;
+
+      cRxMsg = readMessage(3000);
+
+      if(cRxMsg == null) return null;
+
+      delay(10, false);
+
+      /********************************************/
+      publishProgress("HardWare Version Request...");
+
+      if(!sendMessage("VH")) return null;
+
+      cRxMsg = readMessage(3000);
+
+      if(cRxMsg == null) return null;
+
+      delay(10, false);
+
+      /********************************************/
+      publishProgress("Performing command sequence...");
+      FileParser.Command aCmd;
+      cParser.selectFirstCommand();
+      cCmdCount = cParser.getCommandsCount();
+      cCmdIndex = 0;
+      while((aCmd = cParser.getNextCommand()) != null)
+      {
+        sendMessage(aCmd.getCommand());
+        readMessage(100);
+        delay(aCmd.getPause(), true);
+        cCmdIndex++;
+      }
+
+      return "Good!";
+    }
+
+    @Override
+    protected void onProgressUpdate(String... values)
+    {
+      super.onProgressUpdate(values);
+
+      printMessage(values[0], true);
+
+      if(cCmdCount == 0)
+      {
+        mProgressBar.setIndeterminate(true);
+        mProgressBar.setProgress(0);
+      }
+      else
+      {
+        mProgressBar.setIndeterminate(false);
+        mProgressBar.setProgress(100 * cCmdIndex / cCmdCount);
+      }
+
+
+      Log.d(cTag, "Do On Progress");
+    }
+
+    @Override
+    protected void onCancelled()
+    {
+      super.onCancelled();
+
+      Log.d(cTag, "Do On Cancelled");
+    }
+
+    @Override
+    protected void onPostExecute(String aResult)
+    {
+      super.onPostExecute(aResult);
+
+      Log.d(cTag, "Do Post Execute");
+
+      setUIState(TTC_READY);
+
+      mProgressBar.setIndeterminate(false);
+      mProgressBar.setProgress(0);
+
+      if(aResult == null) printMessage("Wrong file!", true);
+
+      printMessage("Done!", true);
+
+      mScriptTask = null;
+    }
+  }
+
+  /************************************************************************************************/
+  /* Alternate Open File Chooser */
+  /************************************************************************************************/
+
+  private class OpenFileListener implements OpenFileDialog.OpenDialogListener
+  {
+    @Override
+    public void OnSelectedFile(String aFileName)
+    {
+      //BitmapFactory.Options mOptions = new BitmapFactory.Options();
+      //mOptions.inPreferredConfig = Bitmap.Config.ARGB_8888;
+      //mOptions.inScaled = false;
+      //mOptions.inJustDecodeBounds = true;
+      //mBitmap = BitmapFactory.decodeFile(aFileName, mOptions);
+
+      //if ((mOptions.outWidth != 48) || (mOptions.outHeight != 32))
+      //{
+      //  Toast.makeText(getApplicationContext(), "Wrond Image Dimentions!", Toast.LENGTH_LONG).show();
+      //}
+      //else
+      //{
+      //  mOptions.inJustDecodeBounds = false;
+      //  mBitmap = BitmapFactory.decodeFile(aFileName, mOptions);
+      //  mImageView.setImageBitmap(mBitmap);
+      //}
+
+      // Clear previous data
+      //mFwFilePath = null;
+      //mCfgFilePath = null;
+      //mTstFilePath = null;
+      //mFileUri = null;
+
+      final File file = new File(aFileName);
+
+      switch(mFileType)
+      {
+        case FILE_TYPE_ZIP:
+          mFwFilePath = aFileName;
+          break;
+        case FILE_TYPE_CFG:
+          mCfgFilePath = aFileName;
+          break;
+        case FILE_TYPE_TST:
+          mTstFilePath = aFileName;
+          break;
+        case FILE_TYPE_NONE:
+        default:
+          break;
+      }
+
+      updateFileInfo(file.getName(), file.length(), aFileName, mFileType);
+    }
+  }
+
+  /************************************************************************************************/
+  /* Alternate Open File Chooser */
+  /************************************************************************************************/
+
+  public void onConfigDeviceBtnClicked(final View view)
+  {
+    if(mCfgFilePath != null)
+    {
+      mScriptTask = new aScriptTask();
+      mScriptTask.execute(mCfgFilePath);
+    }
+    else
+    {
+      printMessage("Select configuration file first...", false);
+    }
+  }
+
+  public void onTestDeviceBtnClicked(final View view)
+  {
+    if(mTstFilePath != null)
+    {
+      mScriptTask = new aScriptTask();
+      mScriptTask.execute(mTstFilePath);
+    }
+    else
+    {
+      printMessage("Select test file first...", false);
+    }
   }
 }

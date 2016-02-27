@@ -68,6 +68,15 @@
     <string name="dfu_upgrade">Upgrade FirmWare</string>
     <string name="dfu_uploading_percentage">%d%%</string>
     <string name="dfu_uploading_error">ERROR</string>
-    <string name="dfu_setfile">Set File</string>
+    <string name="textSetFwFile">Set FW File</string>
+    <string name="textConnect">Connect</string>
+    <string name="textSend">Send</string>
+    <string name="textDat">DAT</string>
+    <string name="rssi">-</string>
+    <string name="textState">Unconnected</string>
+    <string name="textSetCfgFile">Set CFG File</string>
+    <string name="textSetTstFile">Set TST File</string>
+    <string name="textConfigDevice">Configure Device</string>
+    <string name="textTestDevice">Test Device</string>
 
 </resources>
