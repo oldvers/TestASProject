@@ -60,7 +60,6 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.ProgressBar;
-import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -90,8 +89,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
   private static final int     STATE_OFF                  = 10;
 
   private static final String  MIME_TYPE_TEXT             = "text/plain";
-  //private static final String  MIME_TYPE_CFG              = "text/plain";
-  //private static final String  MIME_TYPE_TST              = "text/plain";
 
   private static final String  EXTRA_URI                  = "uri";
 
@@ -125,6 +122,8 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
   private String               mTstFilePath               = null;
 
   private aScriptTask          mScriptTask                = null;
+
+  private CompatTable          mCompatTable               = null;
 
   
   
@@ -286,6 +285,17 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
     mMsgListAdapter   = new ArrayAdapter<String>(this, R.layout.message_detail);
     mMsgList.setAdapter(mMsgListAdapter);
     mMsgList.setDivider(null);
+
+    try
+    {
+      mCompatTable = new CompatTable(getResources());
+
+      if(!mCompatTable.isValid()) throw new Exception("Config Compatibility Table isn't valid!");
+    }
+    catch(Exception e)
+    {
+      printMessage("ERROR: " + e.getMessage(), true);
+    }
 
     initUartService();
   }
@@ -1269,17 +1279,18 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
 
   public class aScriptTask extends AsyncTask<String, String, String>
   {
-    private final int  MODE_IDLE     = 0;
-    private final int  MODE_CONFIG   = 1;
-    private final int  MODE_TEST     = 2;
-    private String     cTag          = "ScriptTask";
-    private String     cRxData       = null;
-    private String     cRxMsg;
-    private byte[]     cTxBuffer;
-    private int        cMode         = MODE_IDLE;
-    private FileParser cParser       = null;
-    private int        cCmdCount     = 0;
-    private int        cCmdIndex     = 0;
+    private final int   MODE_IDLE     = 0;
+    private final int   MODE_CONFIG   = 1;
+    private final int   MODE_TEST     = 2;
+    private String      cTag          = "ScriptTask";
+    private String      cRxData       = null;
+    private String      cRxMsg;
+    private byte[]      cTxBuffer;
+    private int         cMode         = MODE_IDLE;
+    private FileParser  cParser       = null;
+    private int         cCmdCount     = 0;
+    private int         cCmdIndex     = 0;
+
 
     public synchronized void putRxData(byte[] aData)
     {
@@ -1388,6 +1399,9 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
     @Override
     protected synchronized String doInBackground(String... message)
     {
+      String mFileVer, mHWVer, mSWVer;
+      int mFileType;
+
       Log.d(cTag, "Do In Background...");
 
       publishProgress(" - File = " + message[0]);
@@ -1396,9 +1410,11 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
       {
         case MODE_CONFIG:
           cParser = new ConfigFileParser(message[0]);
+          mFileType = CompatTable.CONFIG;
           break;
         case MODE_TEST:
           cParser = new TestFileParser(message[0]);
+          mFileType = CompatTable.TEST;
           break;
         case MODE_IDLE:
         default:
@@ -1408,6 +1424,7 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
       if(!cParser.isValid()) return null;
 
       publishProgress(" - File Version = " + cParser.getFileVersion());
+      mFileVer = cParser.getFileVersion();
 
       /********************************************/
       publishProgress("SoftWare Version Request...");
@@ -1416,7 +1433,13 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
 
       cRxMsg = readMessage(3000);
 
-      if(cRxMsg == null) return null;
+      if((cRxMsg == null) || (!cRxMsg.contains("VS")))
+      {
+        publishProgress("Wrong SoftWare Version!");
+        return null;
+      }
+
+      mSWVer = cRxMsg.substring(cRxMsg.indexOf("VS") + 2);
 
       delay(10, false);
 
@@ -1427,10 +1450,28 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
 
       cRxMsg = readMessage(3000);
 
-      if(cRxMsg == null) return null;
+      if((cRxMsg == null) || (!cRxMsg.contains("VH")))
+      {
+        publishProgress("Wrong HardWare Version!");
+        return null;
+      }
+
+      mHWVer = cRxMsg.substring(cRxMsg.indexOf("VH") + 2);
 
       delay(10, false);
 
+      /********************************************/
+      publishProgress("Checking versions compatibility");
+      publishProgress("   HW = " + mHWVer + " : SW = " + mSWVer + " : File = " + mFileVer);
+      if(mCompatTable.checkValidity(mHWVer, mSWVer, mFileVer, mFileType))
+      {
+        publishProgress("   Success");
+      }
+      else
+      {
+        publishProgress("   ERROR!");
+        return null;
+      }
       /********************************************/
       publishProgress("Performing command sequence...");
       FileParser.Command aCmd;
@@ -1490,7 +1531,7 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
       mProgressBar.setIndeterminate(false);
       mProgressBar.setProgress(0);
 
-      if(aResult == null) printMessage("Wrong file!", true);
+      if(aResult == null) printMessage("ERROR!", true);
 
       printMessage("Done!", true);
 

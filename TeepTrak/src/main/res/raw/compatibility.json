@@ -1,0 +1,9 @@
+{
+  "CompatibilityTable":
+  [
+    {"HW": "AA", "SW": "AA", "CFG": "AA", "TST": "AA"},
+    {"HW": "AA", "SW": "AA", "CFG": "AB", "TST": "BB"},
+    {"HW": "AA", "SW": "AB", "CFG": "AC", "TST": "CC"},
+    {"HW": "BA", "SW": "AB", "CFG": "DD", "TST": "DD"}
+  ]
+}
