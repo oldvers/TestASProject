@@ -115,7 +115,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
   private ProgressBar          mProgressBar;
   private CheckBox             mLedBox;
 
-  private Uri                  mFileUri                   = null;
   private int                  mFileType                  = FILE_TYPE_NONE;
   private String               mFwFilePath                = null;
   private String               mCfgFilePath               = null;
@@ -183,9 +182,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
         @Override
         public void run()
         {
-          //onTransferCompleted();
-          //clearUI(true);
-          //showToast(R.string.dfu_success);
           printMessage(getString(R.string.dfu_status_completed), true);
           // If this activity is still open and upload process was completed, cancel the notification
           final NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -205,9 +201,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
         @Override
         public void run()
         {
-          //onUploadCanceled();
-          //clearUI(false);
-          //showToast(R.string.dfu_aborted);
           printMessage(getString(R.string.dfu_status_aborted), true);
           // if this activity is still open and upload process was completed, cancel the notification
           final NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -222,17 +215,11 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
       mProgressBar.setIndeterminate(false);
       mProgressBar.setProgress(percent);
       mStateLabel.setText(getString(R.string.dfu_uploading_percentage, percent));
-
-      //if (partsTotal > 1)
-      //  mTextUploading.setText(getString(R.string.dfu_status_uploading_part, currentPart, partsTotal));
-      //else
-      //  mTextUploading.setText(R.string.dfu_status_uploading);
     }
 
     @Override
     public void onError(final String deviceAddress, final int error, final int errorType, final String message)
     {
-      //showErrorMessage(message);
       mStateLabel.setText(getString(R.string.dfu_uploading_error, 0));
       // We have to wait a bit before canceling notification. This is called before DfuService creates the last notification.
       new Handler().postDelayed(new Runnable()
@@ -331,19 +318,18 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
 
     public void onServiceDisconnected(ComponentName classname)
     {
-      ////mUartService.disconnect(mBtDevice);
       mUartService = null;
     }
   };
 
   private Handler mHandler = new Handler()
   {
-        @Override
-        //Handler events that received from UART service
-        public void handleMessage(Message msg)
-        {
+    @Override
+    //Handler events that received from UART service
+    public void handleMessage(Message msg)
+    {
 
-        }
+    }
   };
 
   private void setUIState(int aState)
@@ -639,14 +625,8 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
             {
               final DfuServiceInitiator DFU = new DfuServiceInitiator(mBtDevice.getAddress())
                       .setDeviceName(mBtDevice.getName())
-                      .setKeepBond(false) //keepBond);
-                              //if (mFileType == DfuService.TYPE_AUTO)
-
+                      .setKeepBond(false)
                       .setZip(null, mFwFilePath);
-
-              //else {
-              //  starter.setBinOrHex(mFileType, mFileStreamUri, mFilePath).setInitFile(mInitFileStreamUri, mInitFilePath);
-              //}
               DFU.start(this, DfuService.class);
             } else
             {
@@ -684,7 +664,7 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
         mFwFilePath = null;
         mCfgFilePath = null;
         mTstFilePath = null;
-        mFileUri = null;
+        //mFileUri = null;
 
         // Read new one
         final Uri uri = data.getData();
@@ -721,13 +701,13 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
         else if(uri.getScheme().equals("content"))
         {
           // an Uri has been returned
-          mFileUri = uri;
+          //mFileUri = uri;
           // If application returned Uri for streaming, let's use it. Does it works?
           // FIXME both Uris works with Google Drive app. Why both? What's the difference?
           // How about other apps like DropBox?
           final Bundle extras = data.getExtras();
-          if(extras != null && extras.containsKey(Intent.EXTRA_STREAM))
-              mFileUri = extras.getParcelable(Intent.EXTRA_STREAM);
+          //if(extras != null && extras.containsKey(Intent.EXTRA_STREAM))
+          //    mFileUri = extras.getParcelable(Intent.EXTRA_STREAM);
 
           // File name and size must be obtained from Content Provider
           final Bundle bundle = new Bundle();
@@ -779,7 +759,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
             .show();
     }
   }
-
 
 
   /************************************************************************************************/
@@ -885,13 +864,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
       return;
     }
 
-      // Check whether the selected file is a HEX file (we are just checking the extension)
-      //if (!mStatusOk)
-      //{
-      //  Toast.makeText(this, R.string.dfu_file_status_invalid_message, Toast.LENGTH_LONG).show();
-      //  return;
-      //}
-
       // Save current state in order to restore it if user quit the Activity
       //final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
       //final SharedPreferences.Editor editor = preferences.edit();
@@ -907,12 +879,9 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
 
     final DfuServiceInitiator starter = new DfuServiceInitiator(mBtDevice.getAddress())
             .setDeviceName(mBtDevice.getName())
-            .setKeepBond(false) //keepBond);
-    //if (mFileType == DfuService.TYPE_AUTO)
+            .setKeepBond(false)
             .setZip(null, mFwFilePath);
-    //else {
-    //  starter.setBinOrHex(mFileType, mFileStreamUri, mFilePath).setInitFile(mInitFileStreamUri, mInitFilePath);
-    //}
+
     starter.start(this, DfuService.class);
   }
 
@@ -975,8 +944,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
   }
 
 
-
-
   /************************************************************************************************/
   /* Loader Callbacks */
   /************************************************************************************************/
@@ -996,14 +963,10 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
   @Override
   public void onLoaderReset(final Loader<Cursor> loader)
   {
-    //mFileNameView.setText(null);
-    //mFileTypeView.setText(null);
-    //mFileSizeView.setText(null);
     mFwFilePath = null;
     mCfgFilePath = null;
     mTstFilePath = null;
-    mFileUri = null;
-    //mStatusOk = false;
+    //mFileUri = null;
   }
 
   @Override
@@ -1045,15 +1008,10 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
     }
     else
     {
-      //mFileNameView.setText(null);
-      //mFileTypeView.setText(null);
-      //mFileSizeView.setText(null);
       mFwFilePath = null;
       mCfgFilePath = null;
       mTstFilePath = null;
-      mFileUri = null;
-      //mFileStatusView.setText(R.string.dfu_file_status_error);
-      //mStatusOk = false;
+      //mFileUri = null;
     }
   }
 
@@ -1062,7 +1020,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
   {
     String mType;
 
-    //mFileNameView.setText(fileName);
     switch(aFileType)
     {
       case FILE_TYPE_ZIP:
@@ -1079,8 +1036,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
         mType  = "NONE";
         break;
     }
-    //mFileSizeView.setText(getString(R.string.dfu_file_size_text, fileSize));
-    //printMessage("Set File Action :", true);
 
     printMessage("- Path = " + aFilePath, false);
     printMessage("- Name = " + aFileName, false);
@@ -1112,7 +1067,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
     //  }).show();
     //}
   }
-
 
 
   /************************************************************************************************/
@@ -1168,8 +1122,7 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
     //        }).setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
     //  @Override
     //  public void onClick(final DialogInterface dialog, final int which) {
-      mFileType = FILE_TYPE_ZIP;
-      //openFileChooser(mFileType);
+    //openFileChooser(mFileType);
     //  }
     //}).setNeutralButton(R.string.dfu_file_info, new DialogInterface.OnClickListener() {
     //  @Override
@@ -1179,6 +1132,7 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
     //  }
     //}).setNegativeButton(R.string.cancel, null).show();
 
+    mFileType = FILE_TYPE_ZIP;
     OpenFileDialog mFileDialog = new OpenFileDialog(this)
             .setFilter(".*\\.zip")
             .setOpenDialogListener(new OpenFileListener());
@@ -1225,15 +1179,10 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
     //}
   }
 
-
   public void onSetCfgFileBtnClicked(final View view)
   {
     printMessage("Set Config File Action Performed", true);
     mFileType = FILE_TYPE_CFG;
-    //openFileChooser(mFileType);
-
-    //mScriptTask = new aScriptTask();
-    //mScriptTask.execute("");
 
     OpenFileDialog mFileDialog = new OpenFileDialog(this)
             .setFilter(".*\\.cfg")
@@ -1245,33 +1194,13 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
   {
     printMessage("Set Testing File Action Performed :", true);
     mFileType = FILE_TYPE_TST;
-    //openFileChooser(mFileType);
-
-    //final byte[] mRxValue = new byte[8];
-    //mRxValue[0] = 'R';
-    //mRxValue[1] = 'X';
-    //mRxValue[2] = 'V';
-    //mRxValue[3] = 'A';
-    //mRxValue[4] = 'L';
-    //mRxValue[5] = '1';
-    //mRxValue[6] = '2';
-    //mRxValue[7] = '3';
-
-    //if (mScriptTask != null)
-    //{
-    //  mScriptTask.putRxData(mRxValue);
-
-    //  synchronized(mScriptTask)
-    //  {
-    //    mScriptTask.notify();
-    //  }
-    //}
 
     OpenFileDialog mFileDialog = new OpenFileDialog(this)
             .setFilter(".*\\.tst")
             .setOpenDialogListener(new OpenFileListener());
     mFileDialog.show();
   }
+
 
   /************************************************************************************************/
   /* Configuration/Testing Task */
@@ -1294,16 +1223,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
 
     public synchronized void putRxData(byte[] aData)
     {
-      //final byte[] mRxValue = intent.getByteArrayExtra(UartService.EXTRA_DATA);
-
-      //if (mScriptTask != null)
-      //{
-      //  synchronized(mScriptTask)
-      //  {
-      //    mScriptTask.notify();
-      //  }
-      //}
-
       try
       {
         cRxData = new String(aData, "UTF-8");
@@ -1548,29 +1467,6 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
     @Override
     public void OnSelectedFile(String aFileName)
     {
-      //BitmapFactory.Options mOptions = new BitmapFactory.Options();
-      //mOptions.inPreferredConfig = Bitmap.Config.ARGB_8888;
-      //mOptions.inScaled = false;
-      //mOptions.inJustDecodeBounds = true;
-      //mBitmap = BitmapFactory.decodeFile(aFileName, mOptions);
-
-      //if ((mOptions.outWidth != 48) || (mOptions.outHeight != 32))
-      //{
-      //  Toast.makeText(getApplicationContext(), "Wrond Image Dimentions!", Toast.LENGTH_LONG).show();
-      //}
-      //else
-      //{
-      //  mOptions.inJustDecodeBounds = false;
-      //  mBitmap = BitmapFactory.decodeFile(aFileName, mOptions);
-      //  mImageView.setImageBitmap(mBitmap);
-      //}
-
-      // Clear previous data
-      //mFwFilePath = null;
-      //mCfgFilePath = null;
-      //mTstFilePath = null;
-      //mFileUri = null;
-
       final File file = new File(aFileName);
 
       switch(mFileType)
@@ -1592,6 +1488,7 @@ public class MainActivity extends Activity implements LoaderCallbacks<Cursor>
       updateFileInfo(file.getName(), file.length(), aFileName, mFileType);
     }
   }
+
 
   /************************************************************************************************/
   /* Alternate Open File Chooser */
